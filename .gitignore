@@ -1,0 +1,5 @@
+# pi agent 配置
+.agents/
+
+# 分析临时文件（不必要提交）
+analysis-temp-*/
