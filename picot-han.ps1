@@ -13,7 +13,7 @@
     .\picot-han.ps1 -Reset  # 从备份还原
 #>
 
-param([switch]$Check, [switch]$Reset)
+param([switch]$Check, [switch]$Reset, [switch]$TranslatePackages)
 
 $ErrorActionPreference = "Stop"
 $publicDir = Join-Path $env:LOCALAPPDATA "Picot\public"
@@ -1128,6 +1128,119 @@ function Invoke-CompatibilityFixes {
             Old = 'checkUpdatesBtn.textContent = "Checking...";'
             New = 'checkUpdatesBtn.textContent = "正在检查...";'
             Label = "updater check button busy label"
+        }
+        @{
+            RelativePath = "app.js"
+            Old = 'const BROWSE_PAGE_SIZE = 50;'
+            New = @'
+const BROWSE_PAGE_SIZE = 50;
+let browseZhPackageMap = {};
+
+function getBrowsePackageZh(pkg) {
+  return browseZhPackageMap?.[pkg?.name] || null;
+}
+
+function browsePackageDisplayName(pkg) {
+  return getBrowsePackageZh(pkg)?.name || pkg.name || "";
+}
+
+function browsePackageDisplayDescription(pkg) {
+  return getBrowsePackageZh(pkg)?.description || pkg.description || "";
+}
+
+function formatBrowsePackageType(type) {
+  const map = {
+    extension: "扩展",
+    skill: "技能",
+    theme: "主题",
+    prompt: "提示词",
+  };
+  return map[type] || type;
+}
+'@
+            Label = "browse package zh helpers"
+        }
+        @{
+            RelativePath = "app.js"
+            Old = @'
+    const [packages, installed] = await Promise.all([
+      fetchBrowsePackages(),
+      fetchInstalledSources(),
+    ]);
+    browseAllPackages = packages;
+    browseInstalledSet = installed;
+'@
+            New = @'
+    const [packages, installed, zhPackages] = await Promise.all([
+      fetchBrowsePackages(),
+      fetchInstalledSources(),
+      fetchPackageTranslations(),
+    ]);
+    browseAllPackages = packages;
+    browseInstalledSet = installed;
+    browseZhPackageMap = zhPackages;
+'@
+            Label = "browse package zh load"
+        }
+        @{
+            RelativePath = "app.js"
+            Old = @'
+      const inName = pkg.name.toLowerCase().includes(query);
+      const inDesc = (pkg.description || "").toLowerCase().includes(query);
+      const inAuthor = (pkg.author || "").toLowerCase().includes(query);
+      if (!inName && !inDesc && !inAuthor) return false;
+'@
+            New = @'
+      const zh = getBrowsePackageZh(pkg);
+      const inName = pkg.name.toLowerCase().includes(query);
+      const inZhName = (zh?.name || "").toLowerCase().includes(query);
+      const inDesc = (pkg.description || "").toLowerCase().includes(query);
+      const inZhDesc = (zh?.description || "").toLowerCase().includes(query);
+      const inAuthor = (pkg.author || "").toLowerCase().includes(query);
+      if (!inName && !inZhName && !inDesc && !inZhDesc && !inAuthor) return false;
+'@
+            Label = "browse package zh search"
+        }
+        @{
+            RelativePath = "app.js"
+            Old = @'
+  name.textContent = pkg.name;
+  info.appendChild(name);
+
+  if (pkg.description) {
+    const description = document.createElement("div");
+    description.className = "settings-extension-description";
+    description.textContent = pkg.description;
+    info.appendChild(description);
+  }
+'@
+            New = @'
+  name.textContent = browsePackageDisplayName(pkg);
+  if (browsePackageDisplayName(pkg) !== pkg.name) name.title = pkg.name;
+  info.appendChild(name);
+
+  const displayDescription = browsePackageDisplayDescription(pkg);
+  if (displayDescription) {
+    const description = document.createElement("div");
+    description.className = "settings-extension-description";
+    description.textContent = displayDescription;
+    if (displayDescription !== pkg.description) description.title = pkg.description || "";
+    info.appendChild(description);
+  }
+'@
+            Label = "browse package zh render text"
+        }
+        @{
+            RelativePath = "app.js"
+            Old = '    badge.textContent = t;'
+            New = '    badge.textContent = formatBrowsePackageType(t);'
+            Label = "browse package zh type badges"
+        }
+        @{
+            RelativePath = "app.js"
+            Old = '    container.appendChild(createBrowseLinkButton("link", "homepage", homepage));'
+            New = '    container.appendChild(createBrowseLinkButton("link", "主页", homepage));'
+            Label = "browse package zh homepage label"
         }
         @{
             RelativePath = "app-updater.js"
@@ -2945,6 +3058,42 @@ const STAT_LABELS = {
         }
 
         if ($group.Name -eq "app.js") {
+            $browseZhHelpersBlock = @'
+const BROWSE_PAGE_SIZE = 50;
+let browseZhPackageMap = {};
+
+function getBrowsePackageZh(pkg) {
+  return browseZhPackageMap?.[pkg?.name] || null;
+}
+
+function browsePackageDisplayName(pkg) {
+  return getBrowsePackageZh(pkg)?.name || pkg.name || "";
+}
+
+function browsePackageDisplayDescription(pkg) {
+  return getBrowsePackageZh(pkg)?.description || pkg.description || "";
+}
+
+function formatBrowsePackageType(type) {
+  const map = {
+    extension: "扩展",
+    skill: "技能",
+    theme: "主题",
+    prompt: "提示词",
+  };
+  return map[type] || type;
+}
+'@
+            $browseZhHelpersPattern = '(?s)const BROWSE_PAGE_SIZE = 50;\r?\n(?:let browseZhPackageMap = \{\};\r?\n\r?\nfunction getBrowsePackageZh\(pkg\) \{\r?\n  return browseZhPackageMap\?\.\[pkg\?\.name\] \|\| null;\r?\n\}\r?\n\r?\nfunction browsePackageDisplayName\(pkg\) \{\r?\n  return getBrowsePackageZh\(pkg\)\?\.name \|\| pkg\.name \|\| "";\r?\n\}\r?\n\r?\nfunction browsePackageDisplayDescription\(pkg\) \{\r?\n  return getBrowsePackageZh\(pkg\)\?\.description \|\| pkg\.description \|\| "";\r?\n\}\r?\n\r?\nfunction formatBrowsePackageType\(type\) \{\r?\n  const map = \{\r?\n    extension: "扩展",\r?\n    skill: "技能",\r?\n    theme: "主题",\r?\n    prompt: "提示词",\r?\n  \};\r?\n  return map\[type\] \|\| type;\r?\n\}\r?\n)+'
+            if ([regex]::IsMatch($newText, $browseZhHelpersPattern)) {
+                $dedupedText = [regex]::Replace($newText, $browseZhHelpersPattern, ($browseZhHelpersBlock.TrimEnd() + "`r`n"), 1)
+                if ($dedupedText -ne $newText) {
+                    $changed++
+                    Write-Host "兼容性修复: app.js - browse package zh helpers dedupe" -ForegroundColor Cyan
+                    $newText = $dedupedText
+                }
+            }
+
             $thinkingLabelsBlock = @'
 const THINKING_LEVEL_LABELS = {
   off: "关闭",
@@ -2959,6 +3108,144 @@ function formatThinkingLevelDisplay(level) {
 '@
             $thinkingLabelsPattern = '(?s)(?:const THINKING_LEVEL_LABELS = \{\r?\n  off: "关闭",\r?\n  minimal: "极低",\r?\n  low: "低",\r?\n  medium: "中",\r?\n  high: "高",\r?\n\};\r?\nfunction formatThinkingLevelDisplay\(level\) \{\r?\n  return THINKING_LEVEL_LABELS\[level \|\| "off"\] \|\| level \|\| "关闭";\r?\n\}\r?\n)+function formatCompactThinkingLevelLabel\(level\) \{'
             $newText = [regex]::Replace($newText, $thinkingLabelsPattern, ($thinkingLabelsBlock.TrimEnd() + "`r`nfunction formatCompactThinkingLevelLabel(level) {"))
+
+            if (-not $newText.Contains("async function fetchPackageTranslations()")) {
+                $fetchPackageTranslationsBlock = @'
+async function fetchPackageTranslations() {
+  try {
+    const res = await fetch(`/package-zh-cache.json?t=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return {};
+    const data = await res.json();
+    return data?.packages && typeof data.packages === "object" ? data.packages : {};
+  } catch {
+    return {};
+  }
+}
+
+'@
+                $fetchInstalledPattern = '(?m)^async function fetchInstalledSources\(\) \{'
+                if ([regex]::IsMatch($newText, $fetchInstalledPattern)) {
+                    $changed++
+                    Write-Host "兼容性修复: app.js - browse package zh cache fetch" -ForegroundColor Cyan
+                    $newText = [regex]::Replace($newText, $fetchInstalledPattern, ($fetchPackageTranslationsBlock + "async function fetchInstalledSources() {"), 1)
+                }
+                else {
+                    Write-Warning "兼容性修复未找到匹配内容: app.js - browse package zh cache fetch"
+                }
+            }
+
+            if (-not $newText.Contains("package-list-cache.json")) {
+                $browseFetchPattern = '(?s)async function fetchBrowsePackages\(\) \{\r?\n  const pageSize = 250;\r?\n  const all = \[\];\r?\n  let page = 1;\r?\n  let totalPages = 1;\r?\n  do \{\r?\n    const res = await fetch\(`\$\{PKG_API_BASE\}/packages\?page=\$\{page\}&pageSize=\$\{pageSize\}`\);\r?\n    if \(!res\.ok\) throw new Error\(`Registry returned \$\{res\.status\}`\);\r?\n    const data = await res\.json\(\);\r?\n    if \(Array\.isArray\(data\?\.packages\)\) all\.push\(\.\.\.data\.packages\);\r?\n    totalPages = Number\(data\?\.totalPages\) \|\| 1;\r?\n    page \+= 1;\r?\n  \} while \(page <= totalPages\);\r?\n  return all;\r?\n\}'
+                $browseFetchBlock = @'
+async function fetchBrowsePackagesRemote() {
+  const pageSize = 250;
+  const all = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const res = await fetch(`${PKG_API_BASE}/packages?page=${page}&pageSize=${pageSize}`);
+    if (!res.ok) throw new Error(`Registry returned ${res.status}`);
+    const data = await res.json();
+    if (Array.isArray(data?.packages)) all.push(...data.packages);
+    totalPages = Number(data?.totalPages) || 1;
+    page += 1;
+  } while (page <= totalPages);
+  return all;
+}
+
+async function fetchBrowsePackages() {
+  try {
+    const res = await fetch(`/package-list-cache.json?t=${Date.now()}`, { cache: "no-store" });
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data?.packages) && data.packages.length) {
+        return data.packages;
+      }
+    }
+  } catch {
+    // Local cache is optional; fall back to the remote registry.
+  }
+  return fetchBrowsePackagesRemote();
+}
+'@
+                if ([regex]::IsMatch($newText, $browseFetchPattern)) {
+                    $changed++
+                    Write-Host "兼容性修复: app.js - browse package local list cache" -ForegroundColor Cyan
+                    $newText = [regex]::Replace($newText, $browseFetchPattern, $browseFetchBlock, 1)
+                }
+                else {
+                    Write-Warning "兼容性修复未找到匹配内容: app.js - browse package local list cache"
+                }
+            }
+
+            if (-not $newText.Contains("browseZhPackageMap = zhPackages;")) {
+                $browseLoadPattern = '(?s)    const \[packages, installed\] = await Promise\.all\(\[\r?\n      fetchBrowsePackages\(\),\r?\n      fetchInstalledSources\(\),\r?\n    \]\);\r?\n    browseAllPackages = packages;\r?\n    browseInstalledSet = installed;'
+                $browseLoadBlock = @'
+    const [packages, installed, zhPackages] = await Promise.all([
+      fetchBrowsePackages(),
+      fetchInstalledSources(),
+      fetchPackageTranslations(),
+    ]);
+    browseAllPackages = packages;
+    browseInstalledSet = installed;
+    browseZhPackageMap = zhPackages;
+'@
+                if ([regex]::IsMatch($newText, $browseLoadPattern)) {
+                    $changed++
+                    Write-Host "兼容性修复: app.js - browse package zh load" -ForegroundColor Cyan
+                    $newText = [regex]::Replace($newText, $browseLoadPattern, $browseLoadBlock, 1)
+                }
+                else {
+                    Write-Warning "兼容性修复未找到匹配内容: app.js - browse package zh load"
+                }
+            }
+
+            if (-not $newText.Contains("const inZhDesc =")) {
+                $browseSearchPattern = '(?s)      const inName = pkg\.name\.toLowerCase\(\)\.includes\(query\);\r?\n      const inDesc = \(pkg\.description \|\| ""\)\.toLowerCase\(\)\.includes\(query\);\r?\n      const inAuthor = \(pkg\.author \|\| ""\)\.toLowerCase\(\)\.includes\(query\);\r?\n      if \(!inName && !inDesc && !inAuthor\) return false;'
+                $browseSearchBlock = @'
+      const zh = getBrowsePackageZh(pkg);
+      const inName = pkg.name.toLowerCase().includes(query);
+      const inZhName = (zh?.name || "").toLowerCase().includes(query);
+      const inDesc = (pkg.description || "").toLowerCase().includes(query);
+      const inZhDesc = (zh?.description || "").toLowerCase().includes(query);
+      const inAuthor = (pkg.author || "").toLowerCase().includes(query);
+      if (!inName && !inZhName && !inDesc && !inZhDesc && !inAuthor) return false;
+'@
+                if ([regex]::IsMatch($newText, $browseSearchPattern)) {
+                    $changed++
+                    Write-Host "兼容性修复: app.js - browse package zh search" -ForegroundColor Cyan
+                    $newText = [regex]::Replace($newText, $browseSearchPattern, $browseSearchBlock, 1)
+                }
+                else {
+                    Write-Warning "兼容性修复未找到匹配内容: app.js - browse package zh search"
+                }
+            }
+
+            if (-not $newText.Contains("const displayDescription = browsePackageDisplayDescription(pkg);")) {
+                $browseRenderPattern = '(?s)  name\.textContent = pkg\.name;\r?\n  info\.appendChild\(name\);\r?\n\r?\n  if \(pkg\.description\) \{\r?\n    const description = document\.createElement\("div"\);\r?\n    description\.className = "settings-extension-description";\r?\n    description\.textContent = pkg\.description;\r?\n    info\.appendChild\(description\);\r?\n  \}'
+                $browseRenderBlock = @'
+  name.textContent = browsePackageDisplayName(pkg);
+  if (browsePackageDisplayName(pkg) !== pkg.name) name.title = pkg.name;
+  info.appendChild(name);
+
+  const displayDescription = browsePackageDisplayDescription(pkg);
+  if (displayDescription) {
+    const description = document.createElement("div");
+    description.className = "settings-extension-description";
+    description.textContent = displayDescription;
+    if (displayDescription !== pkg.description) description.title = pkg.description || "";
+    info.appendChild(description);
+  }
+'@
+                if ([regex]::IsMatch($newText, $browseRenderPattern)) {
+                    $changed++
+                    Write-Host "兼容性修复: app.js - browse package zh render text" -ForegroundColor Cyan
+                    $newText = [regex]::Replace($newText, $browseRenderPattern, $browseRenderBlock, 1)
+                }
+                else {
+                    Write-Warning "兼容性修复未找到匹配内容: app.js - browse package zh render text"
+                }
+            }
         }
 
         if ($group.Name -eq "settings\toggles.js") {
@@ -3042,6 +3329,139 @@ function settingsSaveDisplayTextZh(text) {
     return $changed
 }
 
+# ── 社区包翻译结果导入（从 translation-cache 生成前端 package-zh-cache.json） ──
+function Invoke-PackageTranslationApply {
+    param(
+        [Parameter(Mandatory)][string]$CachePath,
+        [Parameter(Mandatory)][string]$OutputPath,
+        [string]$SourcePath = "",
+        [string]$Model = "qwen3-4b"
+    )
+
+    # 手动翻译的特殊包（与 Python 版 MANUAL_PACKAGES 一致）
+    $manualPackages = @{
+        "@vigolium/piolium" = @{
+            name = "Piolium 安全审计"
+            description = "使用专门的子代理进行多阶段安全审计，支持隔离的上下文窗口、受限并发以及可恢复状态。"
+        }
+    }
+
+    # ── 读取翻译缓存 ──
+    if (-not (Test-Path -LiteralPath $CachePath)) {
+        Write-Warning "翻译缓存不存在: $CachePath"
+        return $false
+    }
+    $cacheRaw = Get-Content -LiteralPath $CachePath -Raw -Encoding UTF8
+    if ([string]::IsNullOrWhiteSpace($cacheRaw)) { Write-Warning "翻译缓存为空"; return $false }
+    $cache = $cacheRaw | ConvertFrom-Json -AsHashtable
+    if (-not $cache -or $cache.Count -eq 0) { Write-Warning "翻译缓存无数据"; return $false }
+
+    # ── 尝试读取 source（可选，用于获取 localizedName / fallbackDescription） ──
+    $sourceItems = @{}
+    if ($SourcePath -and (Test-Path -LiteralPath $SourcePath)) {
+        try {
+            $sourceRaw = Get-Content -LiteralPath $SourcePath -Raw -Encoding UTF8
+            $source = $sourceRaw | ConvertFrom-Json -AsHashtable
+            if ($source.ContainsKey("items") -and $source["items"] -is [array]) {
+                foreach ($item in $source["items"]) {
+                    if (-not ($item -is [hashtable])) { continue }
+                    $id = if ($item.ContainsKey("id")) { $item["id"] } else { $null }
+                    if (-not $id) { continue }
+                    $sourceItems[$id] = @{
+                        localizedName       = if ($item.ContainsKey("localizedName")) { $item["localizedName"] } else { $id }
+                        fallbackDescription = if ($item.ContainsKey("fallbackDescription")) { $item["fallbackDescription"] } else { "" }
+                        originalDescription = if ($item.ContainsKey("description")) { $item["description"] } else { "" }
+                    }
+                }
+            }
+        }
+        catch {
+            Write-Warning "读取 source 文件失败: $($_.Exception.Message)"
+        }
+    }
+
+    # ── 从缓存键中提取模型名 ──
+    $modelPart = $Model
+    foreach ($k in $cache.Keys) {
+        if ($k -match '\|description\|en\|zh-CN\|LocalModel:(.+)$') {
+            $modelPart = $matches[1]
+            break
+        }
+    }
+
+    # ── 遍历缓存条目，构建包中文映射 ──
+    $packageMap = @{}
+    $count = 0
+
+    foreach ($key in $cache.Keys) {
+        # 解析键: {id}|description|en|zh-CN|LocalModel:{model}
+        if ($key -notmatch '^(.+?)\|description\|en\|zh-CN\|LocalModel:.+$') { continue }
+        $pkgId = $matches[1]
+
+        $entry = $cache[$key]
+        if (-not ($entry -is [hashtable])) { continue }
+
+        $translatedText = if ($entry.ContainsKey("Text")) { $entry["Text"] } else { "" }
+        $originalText   = if ($entry.ContainsKey("Original")) { $entry["Original"] } else { "" }
+
+        if ([string]::IsNullOrEmpty($translatedText)) { continue }
+
+        # ── 确定中文包名 ──
+        $pkgName = $pkgId
+        if ($manualPackages.ContainsKey($pkgId)) {
+            $pkgName = $manualPackages[$pkgId].name
+        }
+        elseif ($sourceItems.ContainsKey($pkgId)) {
+            $pkgName = $sourceItems[$pkgId].localizedName
+        }
+
+        # ── 确定中文描述 ──
+        $pkgDesc = ""
+        if ($manualPackages.ContainsKey($pkgId) -and $manualPackages[$pkgId].description) {
+            $pkgDesc = $manualPackages[$pkgId].description
+        }
+        elseif (-not [string]::IsNullOrEmpty($translatedText) -and $translatedText -ne $originalText) {
+            # 模型返回了有效的翻译（与原文不同）
+            $pkgDesc = $translatedText
+        }
+        elseif ($sourceItems.ContainsKey($pkgId)) {
+            $si = $sourceItems[$pkgId]
+            if ($si.fallbackDescription -and $si.fallbackDescription -ne $si.originalDescription) {
+                $pkgDesc = $si.fallbackDescription
+            }
+        }
+
+        # 只有当有名或描述时才加入（跳过纯英文条目）
+        if ($pkgName -ne $pkgId -or -not [string]::IsNullOrEmpty($pkgDesc)) {
+            $packageMap[$pkgId] = @{
+                name        = $pkgName
+                description = $pkgDesc
+            }
+            $count++
+        }
+    }
+
+    # ── 写入输出 ──
+    $payload = @{
+        generatedAt = (Get-Date -Format "yyyy-MM-ddTHH:mm:ss")
+        langpair    = "en|zh-CN"
+        provider    = "LocalModel"
+        model       = $modelPart
+        packages    = $packageMap
+    }
+
+    $outDir = Split-Path -Parent $OutputPath -Resolve -ErrorAction SilentlyContinue
+    if (-not $outDir) { $outDir = Split-Path -Parent $OutputPath }
+    if (-not (Test-Path -LiteralPath $outDir)) { New-Item -ItemType Directory -Path $outDir -Force | Out-Null }
+
+    $Utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    $jsonText = $payload | ConvertTo-Json -Depth 10
+    [System.IO.File]::WriteAllText($OutputPath, $jsonText, $Utf8NoBom)
+
+    Write-Host "✓ 前端中文包缓存已写入 $count 条 -> $OutputPath" -ForegroundColor Green
+    return $true
+}
+
 # ── 主流程 ──
 Write-Host "Picot Desktop GUI 汉化脚本（完整版）`n" -ForegroundColor Cyan
 Write-Host "目录: $publicDir"
@@ -3067,5 +3487,17 @@ else {
     Write-Host "✓ 已应用 $compatModified 处兼容性修复" -ForegroundColor Green
     Write-Host "备份: $backupDir"
     Write-Host "还原: .\picot-han.ps1 -Reset" -ForegroundColor DarkGray
+
+    if ($TranslatePackages) {
+        Write-Host "`n→ 正在写入社区包中文缓存..." -ForegroundColor Yellow
+        $cachePath  = Join-Path $PSScriptRoot "package-translation-cache.json"
+        $sourcePath = Join-Path $PSScriptRoot "package-i18n-source.json"
+        $outputPath = Join-Path $env:LOCALAPPDATA "Picot\public\package-zh-cache.json"
+        Invoke-PackageTranslationApply -CachePath $cachePath -SourcePath $sourcePath -OutputPath $outputPath
+    }
+    else {
+        Write-Host "社区包信息中文缓存: 已跳过（需要时运行 .\picot-han.ps1 -TranslatePackages）" -ForegroundColor DarkGray
+    }
+
     Write-Host "`n⚠ 请重启 Picot Desktop 后生效" -ForegroundColor Yellow
 }

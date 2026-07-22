@@ -36,8 +36,8 @@ set "choice=%choice: =%"
 
 if "%choice%"=="1" (
     echo.
-    echo 正在汉化...
-    !_ps! -NoProfile -ExecutionPolicy Bypass -File "%~dp0picot-han.ps1"
+    echo 正在汉化（包括社区包中文缓存）...
+    !_ps! -NoProfile -ExecutionPolicy Bypass -File "%~dp0picot-han.ps1" -TranslatePackages
     echo.
     pause
     goto :menu

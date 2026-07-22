@@ -1,0 +1,16 @@
+# pi agent 配置
+.agents/
+
+# 分析临时文件（不必要提交）
+analysis-temp-*/
+
+# Python 编译缓存
+__pycache__/
+*.pyc
+
+# 包翻译管道缓存（可从 Picot 重新提取）
+package-i18n-source.json
+
+# 旧版 Python 翻译脚本（已合并入 picot-han.ps1）
+picot_package_i18n.py
+包翻译.bat
