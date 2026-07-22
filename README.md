@@ -19,6 +19,22 @@ pwsh -NoProfile -File picot-han.ps1 -Check
 pwsh -NoProfile -File picot-han.ps1 -Reset
 ```
 
+## 编码说明
+
+> `汉化.bat` 使用 **UTF-8 编码**（含 BOM）编写。
+
+如果双击运行后**中文显示为乱码**，请开启 Windows 的 UTF-8 支持：
+
+```
+设置 → 时间和语言 → 语言和区域 → 管理语言设置
+→ 更改系统区域设置 → 勾选
+"Beta 版: 使用 Unicode UTF-8 提供全球语言支持(U)"
+→ 确定 → 重启电脑
+```
+
+> ⚠️ 开启后，系统默认代码页变为 `65001`（UTF-8），`汉化.bat` 中的中文可正常显示。
+> 此选项为 Windows 可选功能，对其它程序一般无影响。
+
 ## 特点
 
 - **安全**：HTML 全量翻译，JS 仅翻译长字符串（避免破坏代码逻辑）
@@ -45,6 +61,6 @@ pwsh -NoProfile -File picot-han.ps1 -Reset
 ```
 Picot Desktop GUI 汉化脚本/
 ├── picot-han.ps1    # 主脚本
-├── 汉化.bat          # 快捷启动
+├── 汉化.bat          # 快捷启动（UTF-8 编码）
 └── README.md        # 本文件
 ```
